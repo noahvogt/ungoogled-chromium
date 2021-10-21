@@ -1,0 +1,11 @@
+--- a/chrome/browser/chrome_browser_main.cc
++++ b/chrome/browser/chrome_browser_main.cc
+@@ -940,6 +940,8 @@ int ChromeBrowserMainParts::PreCreateThr
+   if (first_run::IsChromeFirstRun()) {
+     if (!parsed_command_line().HasSwitch(switches::kApp) &&
+         !parsed_command_line().HasSwitch(switches::kAppId)) {
++      browser_creator_.get()->AddFirstRunTab(GURL(
++          "https://ungoogled-software.github.io/ungoogled-chromium-wiki/faq"));
+       AddFirstRunNewTabs(browser_creator_.get(), master_prefs_->new_tabs);
+     }
+ 
