@@ -1,0 +1,228 @@
+--- a/chrome/browser/ui/webui/cr_components/most_visited/most_visited_handler.cc
++++ b/chrome/browser/ui/webui/cr_components/most_visited/most_visited_handler.cc
+@@ -53,7 +53,7 @@ MostVisitedHandler::MostVisitedHandler(
+       page_handler_(this, std::move(pending_page_handler)),
+       page_(std::move(pending_page)) {
+   most_visited_sites_->AddMostVisitedURLsObserver(
+-      this, ntp_tiles::kMaxNumMostVisited);
++      this, ntp_tiles::GridLayout::maxTiles());
+ }
+ 
+ MostVisitedHandler::~MostVisitedHandler() = default;
+--- a/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
++++ b/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
+@@ -46,6 +46,7 @@
+ #include "components/favicon_base/favicon_url_parser.h"
+ #include "components/google/core/common/google_util.h"
+ #include "components/grit/components_scaled_resources.h"
++#include "components/ntp_tiles/constants.h"
+ #include "components/prefs/pref_registry_simple.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/search/ntp_features.h"
+@@ -295,6 +296,10 @@ content::WebUIDataSource* CreateNewTabPa
+       "modulesRedesignedEnabled",
+       base::FeatureList::IsEnabled(ntp_features::kNtpModulesRedesigned));
+ 
++  source->AddInteger("ntpTileColumns", ntp_tiles::GridLayout::columns());
++  source->AddInteger("ntpTileRows", ntp_tiles::GridLayout::rows());
++  source->AddInteger("ntpMaxTiles", ntp_tiles::GridLayout::maxTiles());
++
+   RealboxHandler::SetupWebUIDataSource(source);
+ 
+   webui::SetupWebUIDataSource(
+--- a/chrome/browser/ui/webui/new_tab_page_third_party/new_tab_page_third_party_ui.cc
++++ b/chrome/browser/ui/webui/new_tab_page_third_party/new_tab_page_third_party_ui.cc
+@@ -103,6 +103,10 @@ content::WebUIDataSource* CreateNewTabPa
+   source->AddString("shortcutAlreadyExists", "");
+   source->AddString("urlField", "");
+ 
++  source->AddInteger("ntpTileColumns", ntp_tiles::GridLayout::columns());
++  source->AddInteger("ntpTileRows", ntp_tiles::GridLayout::rows());
++  source->AddInteger("ntpMaxTiles", ntp_tiles::GridLayout::maxTiles());
++
+   webui::SetupWebUIDataSource(
+       source,
+       base::make_span(kNewTabPageThirdPartyResources,
+--- a/chrome/browser/ungoogled_flag_choices.h
++++ b/chrome/browser/ungoogled_flag_choices.h
+@@ -75,4 +75,30 @@ const FeatureEntry::Choice kCloseConfirm
+      "close-confirmation",
+      "multiple"},
+ };
++const FeatureEntry::Choice kNTPTileColumns[] = {
++    {flags_ui::kGenericExperimentChoiceDefault, "", ""},
++    {"1", "ntp-tile-columns", "1"},
++    {"2", "ntp-tile-columns", "2"},
++    {"3", "ntp-tile-columns", "3"},
++    {"4", "ntp-tile-columns", "4"},
++    {"5", "ntp-tile-columns", "5"},
++    {"6", "ntp-tile-columns", "6"},
++    {"7", "ntp-tile-columns", "7"},
++    {"8", "ntp-tile-columns", "8"},
++    {"9", "ntp-tile-columns", "9"},
++    {"10", "ntp-tile-columns", "10"}
++};
++const FeatureEntry::Choice kNTPTileRows[] = {
++    {flags_ui::kGenericExperimentChoiceDefault, "", ""},
++    {"1", "ntp-tile-rows", "1"},
++    {"2", "ntp-tile-rows", "2"},
++    {"3", "ntp-tile-rows", "3"},
++    {"4", "ntp-tile-rows", "4"},
++    {"5", "ntp-tile-rows", "5"},
++    {"6", "ntp-tile-rows", "6"},
++    {"7", "ntp-tile-rows", "7"},
++    {"8", "ntp-tile-rows", "8"},
++    {"9", "ntp-tile-rows", "9"},
++    {"10", "ntp-tile-rows", "10"}
++};
+ #endif  // CHROME_BROWSER_UNGOOGLED_FLAG_CHOICES_H_
+--- a/chrome/browser/ungoogled_flag_entries.h
++++ b/chrome/browser/ungoogled_flag_entries.h
+@@ -88,4 +88,12 @@
+      "Custom New Tab Page",
+      "Allows setting a custom URL for the new tab page.  Value can be internal (e.g. `about:blank`), external (e.g. `example.com`), or local (e.g. `file:///tmp/startpage.html`).  This applies for incognito windows as well when not set to a `chrome://` internal page.  ungoogled-chromium flag",
+      kOsDesktop, ORIGIN_LIST_VALUE_TYPE("custom-ntp", "")},
++    {"ntp-tile-columns",
++     "TEST",
++     "TEST.  ungoogled-chromium flag",
++     kOsDesktop, MULTI_VALUE_TYPE(kNTPTileColumns)},
++    {"ntp-tile-rows",
++     "TEST",
++     "TEST.  ungoogled-chromium flag",
++     kOsDesktop, MULTI_VALUE_TYPE(kNTPTileRows)},
+ #endif  // CHROME_BROWSER_UNGOOGLED_FLAG_ENTRIES_H_
+--- a/components/history/core/browser/top_sites_impl.cc
++++ b/components/history/core/browser/top_sites_impl.cc
+@@ -28,6 +28,7 @@
+ #include "components/history/core/browser/page_usage_data.h"
+ #include "components/history/core/browser/top_sites_observer.h"
+ #include "components/history/core/browser/url_utils.h"
++#include "components/ntp_tiles/constants.h"
+ #include "components/prefs/pref_registry_simple.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/prefs/scoped_user_pref_update.h"
+@@ -191,7 +192,7 @@ void TopSitesImpl::ClearBlockedUrls() {
+ }
+ 
+ bool TopSitesImpl::IsFull() {
+-  return loaded_ && top_sites_.size() >= kTopSitesNumber;
++  return loaded_ && top_sites_.size() >= ntp_tiles::GridLayout::maxTiles();
+ }
+ 
+ PrepopulatedPageList TopSitesImpl::GetPrepopulatedPages() {
+@@ -287,7 +288,7 @@ void TopSitesImpl::DiffMostVisited(const
+ bool TopSitesImpl::AddPrepopulatedPages(MostVisitedURLList* urls) const {
+   bool added = false;
+   for (const auto& prepopulated_page : prepopulated_pages_) {
+-    if (urls->size() >= kTopSitesNumber)
++    if (urls->size() >= ntp_tiles::GridLayout::maxTiles())
+       break;
+     if (!Contains(*urls, prepopulated_page.most_visited.url)) {
+       urls->push_back(prepopulated_page.most_visited);
+@@ -303,7 +304,7 @@ MostVisitedURLList TopSitesImpl::ApplyBl
+   for (const auto& url : urls) {
+     if (IsBlocked(url.url))
+       continue;
+-    if (result.size() >= kTopSitesNumber)
++    if (result.size() >= ntp_tiles::GridLayout::maxTiles())
+       break;
+     result.push_back(url);
+   }
+@@ -370,7 +371,7 @@ int TopSitesImpl::num_results_to_request
+ 
+   const base::Value* blocked_urls =
+       pref_service_->GetDictionary(kBlockedUrlsPrefsKey);
+-  return kTopSitesNumber + (blocked_urls ? blocked_urls->DictSize() : 0);
++  return ntp_tiles::GridLayout::maxTiles() + (blocked_urls ? blocked_urls->DictSize() : 0);
+ }
+ 
+ void TopSitesImpl::MoveStateToLoaded() {
+--- a/components/ntp_tiles/constants.h
++++ b/components/ntp_tiles/constants.h
+@@ -7,8 +7,24 @@
+ 
+ #include <stddef.h>
+ 
++#include "base/command_line.h"
++
+ namespace ntp_tiles {
+ 
++class GridLayout {
++ public:
++  static int columns() {
++    return std::atoi(base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII("ntp-tile-columns").c_str());
++  }
++  static int rows() {
++    return std::atoi(base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII("ntp-tile-rows").c_str());
++  }
++  static size_t maxTiles() {
++    size_t max = columns() * rows();
++    return max > 0 ? max : 10;
++  }
++};
++
+ // Maximum number of custom links that can be set by the user. Used on desktop.
+ extern const size_t kMaxNumCustomLinks;
+ 
+--- a/components/ntp_tiles/custom_links_manager_impl.cc
++++ b/components/ntp_tiles/custom_links_manager_impl.cc
+@@ -73,7 +73,7 @@ const std::vector<CustomLinksManager::Li
+ bool CustomLinksManagerImpl::AddLink(const GURL& url,
+                                      const std::u16string& title) {
+   if (!IsInitialized() || !url.is_valid() ||
+-      current_links_.size() == ntp_tiles::kMaxNumCustomLinks) {
++      current_links_.size() == ntp_tiles::GridLayout::maxTiles()) {
+     return false;
+   }
+ 
+--- a/components/ntp_tiles/most_visited_sites.cc
++++ b/components/ntp_tiles/most_visited_sites.cc
+@@ -643,7 +643,7 @@ void MostVisitedSites::BuildCustomLinks(
+   NTPTilesVector tiles;
+   // The maximum number of custom links that can be shown is independent of the
+   // maximum number of Most Visited sites that can be shown.
+-  size_t num_tiles = std::min(links.size(), kMaxNumCustomLinks);
++  size_t num_tiles = std::min(links.size(), ntp_tiles::GridLayout::maxTiles());
+   for (size_t i = 0; i < num_tiles; ++i) {
+     const CustomLinksManager::Link& link = links.at(i);
+     if (supervisor_ && supervisor_->IsBlocked(link.url))
+--- a/components/ntp_tiles/webui/ntp_tiles_internals_message_handler.cc
++++ b/components/ntp_tiles/webui/ntp_tiles_internals_message_handler.cc
+@@ -59,7 +59,7 @@ NTPTilesInternalsMessageHandler::NTPTile
+     favicon::FaviconService* favicon_service)
+     : favicon_service_(favicon_service),
+       client_(nullptr),
+-      site_count_(ntp_tiles::kMaxNumMostVisited) {}
++      site_count_(ntp_tiles::GridLayout::maxTiles()) {}
+ 
+ NTPTilesInternalsMessageHandler::~NTPTilesInternalsMessageHandler() = default;
+ 
+--- a/ui/webui/resources/cr_components/most_visited/most_visited.js
++++ b/ui/webui/resources/cr_components/most_visited/most_visited.js
+@@ -369,6 +369,8 @@ export class MostVisitedElement extends
+    * @private
+    */
+   computeColumnCount_() {
++    const ntpTileColumns = loadTimeData.getInteger('ntpTileColumns');
++    if (ntpTileColumns > 0) return ntpTileColumns;
+     let maxColumns = 3;
+     if (this.screenWidth_ === ScreenWidth.WIDE) {
+       maxColumns = 5;
+@@ -394,6 +396,8 @@ export class MostVisitedElement extends
+     if (this.columnCount_ === 0) {
+       return 0;
+     }
++    const ntpTileRows = loadTimeData.getInteger('ntpTileRows');
++    if (ntpTileRows > 0) return ntpTileRows;
+ 
+     const shortcutCount = this.tiles_ ? this.tiles_.length : 0;
+     return this.columnCount_ <= shortcutCount ? 2 : 1;
+@@ -404,7 +408,7 @@ export class MostVisitedElement extends
+    * @private
+    */
+   computeMaxTiles_() {
+-    return this.customLinksEnabled_ ? 10 : 8;
++    return loadTimeData.getInteger('ntpMaxTiles');
+   }
+ 
+   /**
