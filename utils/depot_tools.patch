@@ -24,7 +24,7 @@
          gclient_utils.WorkItem.__init__(self, name)
          DependencySettings.__init__(self, parent, url, managed, custom_deps,
                                      custom_vars, custom_hooks, deps_file,
-@@ -730,6 +731,7 @@ class Dependency(gclient_utils.WorkItem,
+@@ -732,6 +733,7 @@ class Dependency(gclient_utils.WorkItem,
  
              condition = dep_value.get('condition')
              dep_type = dep_value.get('dep_type')
@@ -32,7 +32,7 @@
  
              if condition and not self._get_option('process_all_deps', False):
                  if condition not in cached_conditions:
-@@ -846,6 +848,8 @@ class Dependency(gclient_utils.WorkItem,
+@@ -859,6 +861,8 @@ class Dependency(gclient_utils.WorkItem,
  
          self._gn_args_from = local_scope.get('gclient_gn_args_from')
          self._gn_args_file = local_scope.get('gclient_gn_args_file')
@@ -43,7 +43,7 @@
          # to another DEPS will make gclient ignore any other local gn_args*
 --- a/gclient_scm.py
 +++ b/gclient_scm.py
-@@ -844,8 +844,7 @@ class GitWrapper(SCMWrapper):
+@@ -849,8 +849,7 @@ class GitWrapper(SCMWrapper):
          self._SetFetchConfig(options)
  
          # Fetch upstream if we don't already have |revision|.
@@ -53,7 +53,7 @@
              self._Fetch(options, prune=options.force)
  
              if not scm.GIT.IsValidRevision(
-@@ -861,7 +860,7 @@ class GitWrapper(SCMWrapper):
+@@ -866,7 +865,7 @@ class GitWrapper(SCMWrapper):
  
          # This is a big hammer, debatable if it should even be here...
          if options.force or options.reset:
@@ -62,15 +62,15 @@
              if options.upstream and upstream_branch:
                  target = upstream_branch
              self._Scrub(target, options)
-@@ -876,7 +875,6 @@ class GitWrapper(SCMWrapper):
+@@ -881,7 +880,6 @@ class GitWrapper(SCMWrapper):
              # to the checkout step.
              if not (options.force or options.reset):
                  self._CheckClean(revision)
 -            self._CheckDetachedHead(revision, options)
-             if self._Capture(['rev-list', '-n', '1', 'HEAD']) == revision:
-                 self.Print('Up-to-date; skipping checkout.')
-             else:
-@@ -1550,8 +1548,7 @@ class GitWrapper(SCMWrapper):
+ 
+             if not current_revision:
+                 current_revision = self._Capture(
+@@ -1561,8 +1559,7 @@ class GitWrapper(SCMWrapper):
              fetch_cmd.append('--no-tags')
          elif quiet:
              fetch_cmd.append('--quiet')
